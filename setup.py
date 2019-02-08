@@ -2,9 +2,9 @@ from distutils.core import setup
 
 setup(
     name='SexMachine',
-    version='0.1.1',
-    author='Ferhat Elmas',
-    author_email='elmas.ferhat@gmail.com',
+    version='0.1.2',
+    author='Jon Reades',
+    author_email='jon@reades.com',
     packages=['sexmachine', 'sexmachine.test'],
     package_dir={'sexmachine': 'sexmachine'},
     package_data={'sexmachine': ['data/*.txt']},

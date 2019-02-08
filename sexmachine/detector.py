@@ -23,7 +23,7 @@ class Detector:
 
     def __init__(self,
                  case_sensitive=True,
-                 unknown_value=u"andy"):
+                 unknown_value="U"):
 
         """Creates a detector parsing given data file"""
         self.case_sensitive = case_sensitive
@@ -49,13 +49,13 @@ class Detector:
                 name = name.lower()
 
             if parts[0] == "M":
-                self._set(name, u"male", country_values)
+                self._set(name, u"M", country_values)
             elif parts[0] == "1M" or parts[0] == "?M":
-                self._set(name, u"mostly_male", country_values)
+                self._set(name, u"MM", country_values)
             elif parts[0] == "F":
-                self._set(name, u"female", country_values)
+                self._set(name, u"F", country_values)
             elif parts[0] == "1F" or parts[0] == "?F":
-                self._set(name, u"mostly_female", country_values)
+                self._set(name, u"MF", country_values)
             elif parts[0] == "?":
                 self._set(name, self.unknown_value, country_values)
             else:
