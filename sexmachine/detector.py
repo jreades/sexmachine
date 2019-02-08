@@ -1,18 +1,32 @@
-import os.path
-import codecs
+import os
 import gzip
+import operator
 from .mapping import map_name
 
-
 class NoCountryError(Exception):
-    """Raised when non-supported country is queried"""
+    """Raised when unknown country is queried"""
     pass
-
 
 class Detector:
     """Get gender by first name"""
 
-    COUNTRIES = u"""Great Britain, Ireland, USA, Italy, Malta, Portugal, Spain, France, 
+    names     = {}
+    countries = {}
+
+    default_fn = os.path.join('data','nam_dict.txt.gz')
+
+    gmappings = {
+        'M':  'M',
+        '1M': 'MM',
+        '?M': 'MM',
+        'F':  'F',
+        '1F': 'MF',
+        '?F': 'MF',
+        '?':  'A',
+        'NA': 'U'
+    }
+
+    COUNTRIES = [ x.strip() for x in """Great Britain, Ireland, USA, Italy, Malta, Portugal, Spain, France, 
                    Belgium, Luxembourg, The Netherlands, East Frisia, Germany, Austria, 
                    Switzerland, Iceland, Denmark, Norway, Sweden, Finland, Estonia, Latvia, 
                    Lithuania, Poland, Czech Republic, Slovakia, Hungary, Romania, 
@@ -20,21 +34,24 @@ class Detector:
                    Slovenia, Albania, Greece, Russia, Belarus, Moldova, Ukraine, Armenia, 
                    Azerbaijan, Georgia, The Stans, Turkey, Arabia, Israel, China, India, 
                    Japan, Korea, Vietnam, Other
-                 """.split(", ")
+                 """.split(",") ]
 
-    def __init__(self,
-                 case_sensitive=True,
-                 unknown_value="U"):
+    def __init__(self):
 
         """Creates a detector parsing given data file"""
-        self.case_sensitive = case_sensitive
-        self.unknown_value = unknown_value
-        self._parse(os.path.join(os.path.dirname(__file__), "data/nam_dict.txt.gz"))
+
+        self.unknown_value = self.gmappings['NA']
+
+        if len(self.countries) == 0:
+            self.countries = {k: v for v, k in enumerate(self.COUNTRIES)}
+            for v, k in enumerate(self.COUNTRIES):
+                self.countries[k.lower().replace(" ","_")] = v
+
+        if len(self.names) == 0:
+            self._parse(os.path.join(os.path.dirname(__file__), self.default_fn))
 
     def _parse(self, filename):
         """Opens data file and for each line, calls _eat_name_line"""
-        self.names = {}
-        #with codecs.open(filename, encoding="iso8859-1") as f:
         with gzip.open(filename, 'r') as f:
             for line in f:
                 self._eat_name_line(line.decode('iso8859-1').strip())
@@ -42,24 +59,11 @@ class Detector:
     def _eat_name_line(self, line):
         """Parses one line of data file"""
         if line[0] not in "#=":
-            parts = line.split()
-            country_values = line[30:-1]
-            name = map_name(parts[1])
-            if not self.case_sensitive:
-                name = name.lower()
+            gender = line[0:2].strip()
+            name   = map_name(line[3:29].strip())
+            freq   = line[30:-1].replace(" ","0")
 
-            if parts[0] == "M":
-                self._set(name, u"M", country_values)
-            elif parts[0] == "1M" or parts[0] == "?M":
-                self._set(name, u"MM", country_values)
-            elif parts[0] == "F":
-                self._set(name, u"F", country_values)
-            elif parts[0] == "1F" or parts[0] == "?F":
-                self._set(name, u"MF", country_values)
-            elif parts[0] == "?":
-                self._set(name, self.unknown_value, country_values)
-            else:
-                raise "Not sure what to do with a sex of %s" % parts[0]
+            self._set(name, self.gmappings[gender], freq)
 
     def _set(self, name, gender, country_values):
         """Sets gender and relevant country values for names dictionary of detector"""
@@ -70,48 +74,64 @@ class Detector:
             if name not in self.names:
                 self.names[name] = {}
             self.names[name][gender] = country_values
+    
+    def dump_name(self, name):
+        for key, val in self.names[name].items(): 
+            print(key)
+            for i in range(0, len(self.COUNTRIES)):
+                if val[i] != '0': print("\t" + self.COUNTRIES[i] + " -> " + str(int(val[i],16)))
+    
+    def _name_freq(self, country_values):
+        return sum(list(map(lambda c: int(c,16), country_values)))
 
-    def _most_popular_gender(self, name, counter):
-        """Finds the most popular gender for the given name counting by given counter"""
-        if name not in self.names:
-            return self.unknown_value
+    def _max_prob(self, ds):
+        mv = max(ds.items(), key=operator.itemgetter(1))[0]
+        
+        if ds[mv] == 0:
+            return self.gmappings['NA']
+        else:
+            return mv
 
-        #print(self.names[name].keys())
-        max_count, max_tie = (0, 0)
-        best = next(iter(self.names[name].keys()))
-        for gender, country_values in self.names[name].items():
-            print(gender + "-> " + str(counter(country_values)))
-            count, tie = counter(country_values)
-            if count > max_count or (count == max_count and tie > max_tie):
-                max_count, max_tie, best = count, tie, gender
+    def _global_prob(self, name, strict=False):
 
-        return best if max_count > 0 else self.unknown_value
+        glob_results = {} # Store the global results 
 
-    def get_gender(self, name, country=None):
+        for key, val in self.names[name].items():
+            glob_results[key] = self._name_freq(val)
+
+        return self._max_prob(glob_results)
+
+    # Needs a tie-breaker option based on default values? Or a 'U' value
+    # for 'we don't know'? Something different from Androgyne? Guess this is 
+    # where the number of countries comes into it, though seems to me you
+    # also want to weight by country population! Maybe a strict=T/F param
+    # based on whether you want it to infer a value or be specific to that 
+    # country?
+    def _country_prob(self, name, ctry, strict=False):
+        
+        ctry_results = {} # Store the by-country results
+        glob_results = {} # Store the global results 
+
+        ix = self.countries[ctry]
+        for key, val in self.names[name].items():
+            ctry_results[key] = int(val[ix],16)
+            glob_results[key] = self._name_freq(val)
+        
+        if strict is False and max(ctry_results.values()) == 0: 
+            return self._max_prob(glob_results)
+        else:
+            return self._max_prob(ctry_results)
+
+    def get_gender(self, name, country=None, strict=False):
         """Returns best gender for the given name and country pair"""
-        if not self.case_sensitive:
-            name = name.lower()
-
         if name not in self.names:
             return self.unknown_value
+
         elif not country:
-            def counter(country_values):
-                print(",".join(country_values))
-                country_values = country_values.replace(" ", "")
-                #print(sum(list(map(lambda c: int(c) > 64 and int(c)-55 or int(c)-48, country_values))))
-                return (len(list(country_values)),
-                        sum(list(map(lambda c: int(c) > 64 and int(c)-55 or int(c)-48, country_values))))
-            return self._most_popular_gender(name, counter)
-        elif country in self.__class__.COUNTRIES:
-            index = self.__class__.COUNTRIES.index(country)
-            print("Index: " + str(index))
-            counter = lambda e: (try_int(e[index])-32, 0)
-            return self._most_popular_gender(name, counter)
+            return self._global_prob(name)
+
+        elif country in self.countries:
+            return self._country_prob(name, country, strict)
+
         else:
             raise NoCountryError("No such country: %s" % country)
-
-def try_int(x):
-    try:
-        return int(x)
-    except ValueError:
-        return 0
