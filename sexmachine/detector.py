@@ -1,5 +1,6 @@
 import os.path
 import codecs
+import gzip
 from .mapping import map_name
 
 
@@ -11,15 +12,15 @@ class NoCountryError(Exception):
 class Detector:
     """Get gender by first name"""
 
-    COUNTRIES = u"""great_britain ireland usa italy malta portugal spain france
-                   belgium luxembourg the_netherlands east_frisia germany austria
-                   swiss iceland denmark norway sweden finland estonia latvia
-                   lithuania poland czech_republic slovakia hungary romania
-                   bulgaria bosniaand croatia kosovo macedonia montenegro serbia
-                   slovenia albania greece russia belarus moldova ukraine armenia
-                   azerbaijan georgia the_stans turkey arabia israel china india
-                   japan korea vietnam other_countries
-                 """.split()
+    COUNTRIES = u"""Great Britain, Ireland, USA, Italy, Malta, Portugal, Spain, France, 
+                   Belgium, Luxembourg, The Netherlands, East Frisia, Germany, Austria, 
+                   Switzerland, Iceland, Denmark, Norway, Sweden, Finland, Estonia, Latvia, 
+                   Lithuania, Poland, Czech Republic, Slovakia, Hungary, Romania, 
+                   Bulgaria, Bosnia and Croatia, Kosovo, Macedonia, Montenegro, Serbia, 
+                   Slovenia, Albania, Greece, Russia, Belarus, Moldova, Ukraine, Armenia, 
+                   Azerbaijan, Georgia, The Stans, Turkey, Arabia, Israel, China, India, 
+                   Japan, Korea, Vietnam, Other
+                 """.split(", ")
 
     def __init__(self,
                  case_sensitive=True,
@@ -28,16 +29,15 @@ class Detector:
         """Creates a detector parsing given data file"""
         self.case_sensitive = case_sensitive
         self.unknown_value = unknown_value
-        self._parse(os.path.join(os.path.dirname(__file__), "data/nam_dict.txt"))
+        self._parse(os.path.join(os.path.dirname(__file__), "data/nam_dict.txt.gz"))
 
     def _parse(self, filename):
         """Opens data file and for each line, calls _eat_name_line"""
         self.names = {}
-        with codecs.open(filename, encoding="iso8859-1") as f:
+        #with codecs.open(filename, encoding="iso8859-1") as f:
+        with gzip.open(filename, 'r') as f:
             for line in f:
-                if any(map(lambda c: 128 < ord(c) < 160, line)):
-                    line = line.encode("iso8859-1").decode("windows-1252")
-                self._eat_name_line(line.strip())
+                self._eat_name_line(line.decode('iso8859-1').strip())
 
     def _eat_name_line(self, line):
         """Parses one line of data file"""
@@ -76,9 +76,11 @@ class Detector:
         if name not in self.names:
             return self.unknown_value
 
+        #print(self.names[name].keys())
         max_count, max_tie = (0, 0)
         best = next(iter(self.names[name].keys()))
         for gender, country_values in self.names[name].items():
+            print(gender + "-> " + str(counter(country_values)))
             count, tie = counter(country_values)
             if count > max_count or (count == max_count and tie > max_tie):
                 max_count, max_tie, best = count, tie, gender
@@ -94,13 +96,22 @@ class Detector:
             return self.unknown_value
         elif not country:
             def counter(country_values):
-                country_values = map(ord, country_values.replace(" ", ""))
+                print(",".join(country_values))
+                country_values = country_values.replace(" ", "")
+                #print(sum(list(map(lambda c: int(c) > 64 and int(c)-55 or int(c)-48, country_values))))
                 return (len(list(country_values)),
-                        sum(map(lambda c: c > 64 and c-55 or c-48, country_values)))
+                        sum(list(map(lambda c: int(c) > 64 and int(c)-55 or int(c)-48, country_values))))
             return self._most_popular_gender(name, counter)
         elif country in self.__class__.COUNTRIES:
             index = self.__class__.COUNTRIES.index(country)
-            counter = lambda e: (ord(e[index])-32, 0)
+            print("Index: " + str(index))
+            counter = lambda e: (try_int(e[index])-32, 0)
             return self._most_popular_gender(name, counter)
         else:
             raise NoCountryError("No such country: %s" % country)
+
+def try_int(x):
+    try:
+        return int(x)
+    except ValueError:
+        return 0
