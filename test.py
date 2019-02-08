@@ -1,5 +1,6 @@
 import os
 import gzip
+import operator
 
 names = {}
 
@@ -10,7 +11,8 @@ gmappings = {
     'F':  'F',
     '1F': 'MF',
     '?F': 'MF',
-    '?':  'U'
+    '?':  'A',
+    'NA': 'U'
 }
 
 mappings = ((256, ["<A/>"]),
@@ -97,6 +99,9 @@ COUNTRIES = [ x.strip() for x in """Great Britain, Ireland, USA, Italy, Malta, P
                    Azerbaijan, Georgia, The Stans, Turkey, Arabia, Israel, China, India, 
                    Japan, Korea, Vietnam, Other
                  """.split(",") ]
+countries = {k: v for v, k in enumerate(COUNTRIES)}
+for v, k in enumerate(COUNTRIES):
+    countries[k.lower().replace(" ","_")] = v
 
 def _parse(filename):
     """Opens data file and for each line, calls _eat_name_line"""
@@ -160,39 +165,36 @@ print(names['Jamie'])
 #print(" ")
 
 def name_freq(country_values):
-    print(sum(list(map(lambda c: int(c,16), country_values))))
-
-# print("Jamie")
-# dump_name(names['Jamie'])
-
-# print(len(list(names['Jamie']['MF'].replace(" ",""))))
-
-# # sum(list(map(lambda c: int(c) > 64 and int(c)-55 or int(c)-48, country_values)))
-# print(sum(list(map(lambda c: ord(c) > 64 and ord(c)-55 or ord(c)-48, list(names['Jamie']['MF'].replace(" ",""))))))
-
-# print(sum(list(map(lambda c: ord(c) > 64 and ord(c)-55 or ord(c)-48, list(names['Jamie']['F'].replace(" ",""))))))
-
-# print(sum(list(map(lambda c: ord(c) > 64 and ord(c)-55 or ord(c)-48, list(names['Jamie']['MM'].replace(" ",""))))))
-
-print("Maria")
-dump_name(names['Maria'])
-
-print(sum(list(map(lambda c: ord(c) > 64 and ord(c)-55 or ord(c)-48, list(names['Maria']['MF'].replace(" ","0"))))))
-
-name_freq(list(names['Maria']['F'].replace(" ","0")))
+    return sum(list(map(lambda c: int(c,16), country_values)))
 
 # Needs a tie-breaker option based on default values? Or a 'U' value
 # for 'we don't know'? Something different from Androgyne? Guess this is 
 # where the number of countries comes into it, though seems to me you
-# also want to weight by country population! Maybe a most_common=T/F param
-# based on whether you want it to guess a value or be specific to that 
+# also want to weight by country population! Maybe a strict=T/F param
+# based on whether you want it to infer a value or be specific to that 
 # country?
-def country_prob(lkp, ctry):
-    #print(lkp)
-    results = [] # Store the by-country results
+def country_prob(lkp, ctry, strict=False):
+    
+    ctry_results = {} # Store the by-country results
+    glob_results = {} # Store the global results 
+
     ix = COUNTRIES.index(ctry)
     for key, val in lkp.items():
-        results.append( [key, int(val[ix],16)] )
-    return min(results, key=lambda x: x[1])[0]
+        ctry_results[key] = int(val[ix],16)
+        glob_results[key] = name_freq(val)
+    
+    if max(ctry_results.values()) == 0: 
+        if strict is False:
+            return max(glob_results.items(), key=operator.itemgetter(1))[0]
+        else:
+            return gmappings['NA']
+    else:
+         return max(ctry_results.items(), key=operator.itemgetter(1))[0]
 
-print(country_prob(names['Maria'],'Vietnam'))
+print("Jamie")
+dump_name(names['Jamie'])
+print(country_prob(names['Jamie'],'Great Britain',strict=True))
+
+print("Maria")
+dump_name(names['Maria'])
+print(country_prob(names['Maria'],'Italy',strict=False))
