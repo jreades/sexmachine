@@ -33,14 +33,31 @@ class Detector(object):
                  """.split(",") ]
 
     def __init__(self):
+        """Create a new Gender Detector object
 
-        """Creates a detector parsing given data file"""
+        Args:
 
+        Returns:
+            :obj: Object ot type Detector
+        """
+
+        # If the countries dictionary hasn't been loaded
+        # yet then we will load it here -- this is shared
+        # between all objects of this class and so should
+        # be read-only
         if len(Detector.countries) == 0:
             Detector.countries = {k: v for v, k in enumerate(Detector.COUNTRIES)}
             for v, k in enumerate(Detector.COUNTRIES):
                 Detector.countries[k.lower().replace(" ","_")] = v
 
+        # This maps the inputs from the nam_dict.txt
+        # file in to a standard gender descriptor --
+        # these can be modified fairly easily prior
+        # to instantiation of the first object of this
+        # class. After that the results may be fairly
+        # unpredictable: there is a reload method that
+        # may enable this to be changed afterwards but
+        # I have not properly tested it.
         self.mapping = {
             'M':  Detector.male,
             'F':  Detector.female,
@@ -50,17 +67,27 @@ class Detector(object):
             '?F': Detector.mfemale,
             '?':  Detector.androgynous
         }
-
+        
+        # Load the nam_dict data file.
         self.load()
 
     def _parse(self, filename):
-        """Opens data file and for each line, calls _eat_name_line"""
+        """Private method: opens data file and for each line, calls _eat_name_line"""
         with gzip.open(filename, 'r') as f:
             for line in f:
                 self._eat_name_line(line.decode('iso8859-1').strip())
 
     def _eat_name_line(self, line):
-        """Parses one line of data file"""
+        """Parses one line of data file and converts
+        it into a data representation.
+        
+        Lines starting '#' or '=' are skipped.
+        
+        The rest of the line is handled as follows:
+        - Characters 0-2 are interpreted as gender (M, F, 1M, 1F, ?M, ?F, ?)
+        - Characters 3-29 are interpreted as the name
+        - Characters 30-End are interpreted as data (each column/character is a hexadecimal number for a country)
+        """
         if line[0] not in "#=":
             gender = line[0:2].strip()
             name   = map_name(line[3:29].strip())
@@ -69,8 +96,9 @@ class Detector(object):
             self._set(name, gender, freq)
 
     def _set(self, name, gender, country_values):
-        """Sets gender and relevant country values for names dictionary of detector"""
-
+        """Sets gender and relevant country values into the data structure."""
+        
+        # Sets variations on spelling/hyphenation
         if '+' in name:
             for replacement in ['', ' ', '-']:
                 self._set(name.replace('+', replacement), gender, country_values)
@@ -78,25 +106,18 @@ class Detector(object):
             if name not in Detector.names:
                 Detector.names[name] = {}
 
-            # g = Detector.unknown
-            # if gender=='M':
-            #     g = Detector.male
-            # elif gender=='F':
-            #     g = Detector.female
-            # elif gender=='1M':
-            #     g = Detector.mmale
-            # elif gender=='?M':
-            #     g = Detector.mmale
-            # elif gender=='1F':
-            #     g = Detector.mfemale
-            # elif gender=='?F':
-            #     g = Detector.mfemale
-            # elif gender=='?':
-            #     g = Detector.androgynous
-
             Detector.names[name][self.mapping[gender]] = country_values
     
     def dump_name(self, name):
+        """Useful debugging/inspection tool for the data structure.
+
+        Args:
+            name (str): The name to inspect.
+
+        Returns:
+            None: No return value, it simply outputs information for each country.
+
+        """
         if len(Detector.names) == 0:
             self._parse(os.path.join(os.path.dirname(__file__), Detector.default_fn))
 
@@ -106,9 +127,13 @@ class Detector(object):
                 if val[i] != '0': print("\t" + Detector.COUNTRIES[i] + " -> " + str(int(val[i],16)))
     
     def _name_freq(self, country_values):
+        """Calculates a sum across all hexadecimal country values for a given name."""
         return sum(list(map(lambda c: int(c,16), country_values)))
 
     def _max_prob(self, ds):
+        """Works out which gender is 'most likely' (max probability)
+        based on a data structure that contains either the sum for
+        each gender or the value for a specific country."""
         mv = max(ds.items(), key=operator.itemgetter(1))[0]
         
         if ds[mv] == 0:
@@ -117,7 +142,16 @@ class Detector(object):
             return mv
 
     def _global_prob(self, name, strict=False):
+        """Private: works out a likelihood for a given name.
 
+        Args:
+            name (str): The name to search for.
+            strict (bool): Should search only on specified country. Ignored by this method but ensures consistent interface.
+
+        Returns:
+            str: The gender thought most likely to be associated with the name.
+
+        """
         glob_results = {} # Store the global results 
 
         for key, val in Detector.names[name].items():
@@ -125,13 +159,28 @@ class Detector(object):
 
         return self._max_prob(glob_results)
 
-    # Needs a tie-breaker option based on default values? Or a 'U' value
-    # for 'we don't know'? Something different from Androgyne? Guess this is 
-    # where the number of countries comes into it, though seems to me you
-    # also want to weight by country population! Maybe a strict=T/F param
-    # based on whether you want it to infer a value or be specific to that 
-    # country?
     def _country_prob(self, name, ctry, strict=False):
+        """Private: works out a likelihood for a given name.
+
+        I'm unclear as to whether these results should be weighted by the
+        population of the countries (e.g. a '1' for USA and a '1' for 
+        Luxembourg should not be treated equally when trying to work out
+        the likely gender).
+        
+        The strict parameter set to True means that _only_ the specified 
+        country is considered when inferring gender. If false (the default)
+        then _if_ no specific country value is found then the global 
+        distribution will be used. If true (the other option) then it 
+        will return _only_ the country value _even if_ that value is 0.
+
+        Args:
+            name (str): The name to search for.
+            strict (bool): Should search be confined to only the specified country. Defaults to False.
+
+        Returns:
+            str: The gender thought most likely to be associated with the name.
+
+        """
         
         ctry_results = {} # Store the by-country results
         glob_results = {} # Store the global results 
@@ -147,15 +196,32 @@ class Detector(object):
             return self._max_prob(ctry_results)
 
     def load(self):
+        """Used to load the data. Normally called by __init__."""
         if len(Detector.names) == 0:
             self._parse(os.path.join(os.path.dirname(__file__), Detector.default_fn))
     
     def reload(self):
+        """May enable the data set to be reloaded with a new set of return values based on the class variables."""
         Detector.names = {}
         self.load()
 
     def get_gender(self, name, country=None, strict=False):
-        """Returns best gender for the given name and country pair"""
+        """Returns best gender for the given name and country pair.
+        
+        The strict parameter set to True means that _only_ the specified
+        country is considered when inferring gender. If false (the default)
+        then _if_ no specific country value is found then the global
+        distribution will be used. If true (the other option) then it
+        will return _only_ the country value _even if_ that value is 0.
+
+        Args:
+            name (str): The name to search for.
+            ctry (str): The name of the country. Defaults to None for a global search.
+            strict (bool): Should search be confined to only the specified country. Defaults to False.
+
+        Returns:
+            str: The gender thought most likely to be associated with the name.
+        """
         if len(Detector.names) == 0:
             self._parse(os.path.join(os.path.dirname(__file__), Detector.default_fn))
 
