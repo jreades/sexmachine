@@ -22,17 +22,6 @@ class Detector:
     mmale       = 'MM'
     mfemale     = 'MF'
 
-    gmappings = {
-        'M':  male,
-        '1M': mmale,
-        '?M': mmale,
-        'F':  female,
-        '1F': mfemale,
-        '?F': mfemale,
-        '?':  androgynous,
-        'NA': unknown
-    }
-
     COUNTRIES = [ x.strip() for x in """Great Britain, Ireland, USA, Italy, Malta, Portugal, Spain, France, 
                    Belgium, Luxembourg, The Netherlands, East Frisia, Germany, Austria, 
                    Switzerland, Iceland, Denmark, Norway, Sweden, Finland, Estonia, Latvia, 
@@ -47,7 +36,16 @@ class Detector:
 
         """Creates a detector parsing given data file"""
 
-        self.unknown_value = self.gmappings['NA']
+        self.gmappings = {
+            'M':  male,
+            '1M': mmale,
+            '?M': mmale,
+            'F':  female,
+            '1F': mfemale,
+            '?F': mfemale,
+            '?':  androgynous,
+            'NA': unknown
+        }
 
         if len(self.countries) == 0:
             self.countries = {k: v for v, k in enumerate(self.COUNTRIES)}
@@ -132,7 +130,7 @@ class Detector:
     def get_gender(self, name, country=None, strict=False):
         """Returns best gender for the given name and country pair"""
         if name not in self.names:
-            return self.unknown_value
+            return self.unknown
 
         elif not country:
             return self._global_prob(name)
