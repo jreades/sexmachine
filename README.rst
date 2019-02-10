@@ -2,52 +2,49 @@
 Sex Machine
 ===========
 
-PyPI status:
-
-.. image:: https://pypip.in/v/SexMachine/badge.png
-    :target: https://pypi.python.org/pypi/SexMachine/
-
-.. image:: https://pypip.in/d/SexMachine/badge.png
-    :target: https://pypi.python.org/pypi/SexMachine/
-
-This package uses the underlying data from the program "gender" by Jorg Michael (described `here <http://www.autohotkey.com/community/viewtopic.php?t=22000>`_).  Its use is pretty straightforward::
+This package uses the underlying name frequency data from the program "gender" by Jorg Michael (described `here <http://www.autohotkey.com/community/viewtopic.php?t=22000>`_), and has been adapted from the original `Sex Machine <https://pypi.org/project/SexMachine/>`_ codebase to work with Python 3. Its use remains pretty straightforward::
 
     >>> import sexmachine.detector as gender
     >>> d = gender.Detector()
-    >>> d.get_gender(u"Bob")
-    u'male'
-    >>> d.get_gender(u"Sally")
-    u'female'
-    >>> d.get_gender(u"Pauley") # should be androgynous
-    u'andy'
+    >>> d.get_gender("Bob")
+    'M'
+    >>> d.get_gender("Sally")
+    'F'
+    >>> d.get_gender("Pauley") # should be androgynous
+    'A'
+    >>> d.get_gender("Tracey") # usually/mostly female
+    'MF'
 
-The result will be one of ``andy`` (androgynous), ``male``, ``female``, ``mostly_male``, or ``mostly_female``.  Any unknown names are considered andies. Moreover, you can set unknown value to whatever you want::
+The result will be one of ``A`` (Androgynous), ``M`` (Male), ``F`` (Female), ``MM`` (Mostly Male), ``MF`` (Mostly Female) or ``U`` (Unknown). These values can be set to whatever you want using class-level variables as long as you do so before creating an actual detector::
     
-    >>> d = gender.Detector(unknown_value=u"ferhat")
-    >>> d.get_gender(u"Pauley")
-    u'ferhat'
+    >>> import sexmachine.detector as g
+    >>> gender.Detector.male  = 'Male'
+    >>> gender.Detector.mmale = 'Male'
+    >>> d = gender.Detector()
+    >>> d.get_gender("Jon")
+    'Male'
 
 I18N is fully supported::
 
-    >>> d.get_gender(u"Álfrún")
-    u'female'
+    >>> d.get_gender("Álfrún")
+    'F'
 
 Additionally, you can give preference to specific countries::
 
-    >>> d.get_gender(u"Jamie")
-    u'mostly_female'
-    >>> d.get_gender(u"Jamie", u'great_britain')
-    u'mostly_male'
+    >>> d.get_gender("Jamie")
+    'MF'
+    >>> d.get_gender("Jamie", 'Great Britain') # or 'great_britain' for backwards compatibility
+    'MM'
 
-Additionally, you can create a detector that is not case sensitive (default *is* to be case sensitive)::
+Unlike the original SexMachine library this version uses a shared read-only dictionary so there is no particular penalty for creating multiple instances. Of course, if you want to change anything on the fly (e.g. a default return value) then you hae a very big problem.
 
-    >>> d = sexmachine.detector.Detector(case_sensitive=False)
-    >>> d.get_gender(u"sally")
-    u'female'
-    >>> d.get_gender(u"Sally")
-    u'female'
+As well, in the interests of keeping the package distribution as small as possible, the name_dict.txt file has been gzipped with concommitant changes to the code and reuqirements.
 
-Try to avoid creating many Detectors, as each creation means reading the data file.
+You can also now check the version::
+
+    >>> import sexmachine
+    >>> sexmachine.__version__
+    '0.1.3'
 
 Licenses
 ========
