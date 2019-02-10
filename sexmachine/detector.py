@@ -15,15 +15,22 @@ class Detector:
 
     default_fn = os.path.join('data','nam_dict.txt.gz')
 
+    male        = 'M'
+    female      = 'F'
+    androgynous = 'A'
+    unknown     = 'U'
+    mmale       = 'MM'
+    mfemale     = 'MF'
+
     gmappings = {
-        'M':  'M',
-        '1M': 'MM',
-        '?M': 'MM',
-        'F':  'F',
-        '1F': 'MF',
-        '?F': 'MF',
-        '?':  'A',
-        'NA': 'U'
+        'M':  male,
+        '1M': mmale,
+        '?M': mmale,
+        'F':  female,
+        '1F': mfemale,
+        '?F': mfemale,
+        '?':  androgynous,
+        'NA': unknown
     }
 
     COUNTRIES = [ x.strip() for x in """Great Britain, Ireland, USA, Italy, Malta, Portugal, Spain, France, 
