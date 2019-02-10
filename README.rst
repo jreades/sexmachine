@@ -18,8 +18,7 @@ This package uses the underlying name frequency data from the program "gender" b
 The result will be one of ``A`` (Androgynous), ``M`` (Male), ``F`` (Female), ``MM`` (Mostly Male), ``MF`` (Mostly Female) or ``U`` (Unknown). These values can be set to whatever you want using class-level variables as long as you do so before creating an actual detector::
     
     >>> import sexmachine.detector as gender
-    >>> gender.Detector.male  = 'Male'
-    >>> gender.Detector.mmale = 'Male'
+    >>> gender.Detector.male  = 'Male' # Class cars are: male, female, mmale, mfemale, unknown, androgynous
     >>> d = gender.Detector()
     >>> d.get_gender("Jon")
     'Male'
