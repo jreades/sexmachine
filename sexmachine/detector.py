@@ -7,7 +7,7 @@ class NoCountryError(Exception):
     """Raised when unknown country is queried"""
     pass
 
-class Detector:
+class Detector(object):
     """Get gender by first name"""
 
     names     = {}
@@ -36,24 +36,22 @@ class Detector:
 
         """Creates a detector parsing given data file"""
 
-        self.gmappings = {
-            'M':  male,
-            '1M': mmale,
-            '?M': mmale,
-            'F':  female,
-            '1F': mfemale,
-            '?F': mfemale,
-            '?':  androgynous,
-            'NA': unknown
+        if len(Detector.countries) == 0:
+            Detector.countries = {k: v for v, k in enumerate(Detector.COUNTRIES)}
+            for v, k in enumerate(Detector.COUNTRIES):
+                Detector.countries[k.lower().replace(" ","_")] = v
+
+        self.mapping = {
+            'M':  Detector.male,
+            'F':  Detector.female,
+            '1M': Detector.mmale,
+            '?M': Detector.mmale,
+            '1F': Detector.mfemale,
+            '?F': Detector.mfemale,
+            '?':  Detector.androgynous
         }
 
-        if len(self.countries) == 0:
-            self.countries = {k: v for v, k in enumerate(self.COUNTRIES)}
-            for v, k in enumerate(self.COUNTRIES):
-                self.countries[k.lower().replace(" ","_")] = v
-
-        if len(self.names) == 0:
-            self._parse(os.path.join(os.path.dirname(__file__), self.default_fn))
+        self.load()
 
     def _parse(self, filename):
         """Opens data file and for each line, calls _eat_name_line"""
@@ -68,23 +66,44 @@ class Detector:
             name   = map_name(line[3:29].strip())
             freq   = line[30:-1].replace(" ","0")
 
-            self._set(name, self.gmappings[gender], freq)
+            self._set(name, gender, freq)
 
     def _set(self, name, gender, country_values):
         """Sets gender and relevant country values for names dictionary of detector"""
+
         if '+' in name:
             for replacement in ['', ' ', '-']:
                 self._set(name.replace('+', replacement), gender, country_values)
         else:
-            if name not in self.names:
-                self.names[name] = {}
-            self.names[name][gender] = country_values
+            if name not in Detector.names:
+                Detector.names[name] = {}
+
+            # g = Detector.unknown
+            # if gender=='M':
+            #     g = Detector.male
+            # elif gender=='F':
+            #     g = Detector.female
+            # elif gender=='1M':
+            #     g = Detector.mmale
+            # elif gender=='?M':
+            #     g = Detector.mmale
+            # elif gender=='1F':
+            #     g = Detector.mfemale
+            # elif gender=='?F':
+            #     g = Detector.mfemale
+            # elif gender=='?':
+            #     g = Detector.androgynous
+
+            Detector.names[name][self.mapping[gender]] = country_values
     
     def dump_name(self, name):
-        for key, val in self.names[name].items(): 
+        if len(Detector.names) == 0:
+            self._parse(os.path.join(os.path.dirname(__file__), Detector.default_fn))
+
+        for key, val in Detector.names[name].items(): 
             print(key)
-            for i in range(0, len(self.COUNTRIES)):
-                if val[i] != '0': print("\t" + self.COUNTRIES[i] + " -> " + str(int(val[i],16)))
+            for i in range(0, len(Detector.COUNTRIES)):
+                if val[i] != '0': print("\t" + Detector.COUNTRIES[i] + " -> " + str(int(val[i],16)))
     
     def _name_freq(self, country_values):
         return sum(list(map(lambda c: int(c,16), country_values)))
@@ -93,7 +112,7 @@ class Detector:
         mv = max(ds.items(), key=operator.itemgetter(1))[0]
         
         if ds[mv] == 0:
-            return self.gmappings['NA']
+            return Detector.unknown
         else:
             return mv
 
@@ -101,7 +120,7 @@ class Detector:
 
         glob_results = {} # Store the global results 
 
-        for key, val in self.names[name].items():
+        for key, val in Detector.names[name].items():
             glob_results[key] = self._name_freq(val)
 
         return self._max_prob(glob_results)
@@ -118,7 +137,7 @@ class Detector:
         glob_results = {} # Store the global results 
 
         ix = self.countries[ctry]
-        for key, val in self.names[name].items():
+        for key, val in Detector.names[name].items():
             ctry_results[key] = int(val[ix],16)
             glob_results[key] = self._name_freq(val)
         
@@ -127,15 +146,26 @@ class Detector:
         else:
             return self._max_prob(ctry_results)
 
+    def load(self):
+        if len(Detector.names) == 0:
+            self._parse(os.path.join(os.path.dirname(__file__), Detector.default_fn))
+    
+    def reload(self):
+        Detector.names = {}
+        self.load()
+
     def get_gender(self, name, country=None, strict=False):
         """Returns best gender for the given name and country pair"""
-        if name not in self.names:
-            return self.unknown
+        if len(Detector.names) == 0:
+            self._parse(os.path.join(os.path.dirname(__file__), Detector.default_fn))
+
+        if name not in Detector.names:
+            return Detector.unknown
 
         elif not country:
             return self._global_prob(name)
 
-        elif country in self.countries:
+        elif country in Detector.countries:
             return self._country_prob(name, country, strict)
 
         else:
