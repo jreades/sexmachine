@@ -2,7 +2,6 @@
 import unittest
 import sexmachine.mapping as m
 
-
 class TestMapping(unittest.TestCase):
 
     def test_map_name(self):
