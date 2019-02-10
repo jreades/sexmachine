@@ -7,7 +7,7 @@ setup(
     author_email='jon@reades.com',
     packages=['sexmachine', 'sexmachine.test'],
     package_dir={'sexmachine': 'sexmachine'},
-    package_data={'sexmachine': ['data/*.txt']},
+    package_data={'sexmachine': ['data/*.txt.gz']},
     url='https://github.com/ferhatelmas/sexmachine/',
     license='GPLv3',
     description='Get the gender from first name.',
