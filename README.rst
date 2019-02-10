@@ -2,6 +2,10 @@
 Sex Machine
 ===========
 
+Installation::
+
+    >>> pip install git+https://github.com/jreades/sexmachine.git
+
 This package uses the underlying name frequency data from the program "gender" by Jorg Michael (described `here <http://www.autohotkey.com/community/viewtopic.php?t=22000>`_), and has been adapted from the original `Sex Machine <https://pypi.org/project/SexMachine/>`_ codebase to work with Python 3. Its use remains pretty straightforward::
 
     >>> import sexmachine.detector as gender
